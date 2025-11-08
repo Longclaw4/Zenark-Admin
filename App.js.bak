@@ -1,0 +1,1295 @@
+import React, { useState, useRef } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { 
+  View, 
+  Text, 
+  ScrollView, 
+  TouchableOpacity, 
+  TextInput, 
+  Dimensions,
+  Platform,
+  Switch,
+  PanResponder,
+  Animated
+} from 'react-native';
+import styles from './AppStyles';
+
+const { width, height } = Dimensions.get('window');
+const isTablet = width >= 600;
+
+// Main App Component
+export default function App() {
+  const [activeTab, setActiveTab] = useState('settings');
+  const [selectedClass, setSelectedClass] = useState('overall');
+  const [darkMode, setDarkMode] = useState(false);
+  const [notifications, setNotifications] = useState(true);
+  const [showSubjectManager, setShowSubjectManager] = useState(false);
+  const [newSubject, setNewSubject] = useState('');
+  const [subjects, setSubjects] = useState([
+    { name: 'Math', grade10A: 95, schoolAvg: 85 },
+    { name: 'Science', grade10A: 65, schoolAvg: 70 },
+    { name: 'English', grade10A: 50, schoolAvg: 65 },
+    { name: 'History', grade10A: 95, schoolAvg: 75 },
+    { name: 'Geography', grade10A: 85, schoolAvg: 80 },
+    { name: 'Computer', grade10A: 90, schoolAvg: 78 }
+  ]);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const addSubject = () => {
+    if (newSubject.trim()) {
+      setSubjects([
+        ...subjects,
+        { 
+          name: newSubject.trim(),
+          grade10A: Math.floor(Math.random() * 30) + 60, // Random score between 60-90
+          schoolAvg: Math.floor(Math.random() * 30) + 60
+        }
+      ]);
+      setNewSubject('');
+    }
+  };
+
+  const removeSubject = (index) => {
+    const updatedSubjects = [...subjects];
+    updatedSubjects.splice(index, 1);
+    setSubjects(updatedSubjects);
+  };
+
+  // Tab order for swiping
+  const tabs = ['settings', 'home', 'reports'];
+  
+  // Pan responder for swipe gestures
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only respond to horizontal swipes (not vertical scrolling)
+        const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        const hasMovedEnough = Math.abs(gestureState.dx) > 10;
+        return isHorizontal && hasMovedEnough;
+      },
+      onPanResponderGrant: () => {
+        // User started swiping
+      },
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (evt, gestureState) => {
+        // Visual feedback during swipe - optional
+        if (Math.abs(gestureState.dx) > 5) {
+          slideAnim.setValue(gestureState.dx * 0.5);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const currentIndex = tabs.indexOf(activeTab);
+        const swipeThreshold = 40; // Lower threshold for easier swiping
+        const velocityThreshold = 0.3; // Velocity-based detection
+        
+        // Reset animation
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          speed: 20,
+          bounciness: 8,
+        }).start();
+        
+        // Check both distance and velocity for better detection
+        const shouldSwipeLeft = (gestureState.dx > swipeThreshold || gestureState.vx > velocityThreshold) && currentIndex > 0;
+        const shouldSwipeRight = (gestureState.dx < -swipeThreshold || gestureState.vx < -velocityThreshold) && currentIndex < tabs.length - 1;
+        
+        // Swipe left to right (go to previous page)
+        if (shouldSwipeLeft) {
+          setActiveTab(tabs[currentIndex - 1]);
+        }
+        // Swipe right to left (go to next page)
+        else if (shouldSwipeRight) {
+          setActiveTab(tabs[currentIndex + 1]);
+        }
+      },
+    })
+  ).current;
+
+  // Class selection options
+  const classOptions = [
+    { id: 'overall', label: 'Overall School' },
+    { id: 'grade10a', label: 'Grade 10A' },
+    { id: 'grade10b', label: 'Grade 10B' },
+    { id: 'academic', label: 'Academic Pressure' },
+    { id: 'fout', label: 'Fout Firales' },
+    { id: 'dardale', label: 'Dardale line Scrent' },
+    { id: 'ovstier', label: 'Ovstier 15s' },
+  ];
+
+  // Render Home Screen
+  const renderHome = () => (
+    <ScrollView style={styles.pageContainer} contentContainerStyle={styles.pageContent}>
+      <View style={styles.gridContainer}>
+        {/* Left Column */}
+        <View style={styles.leftColumn}>
+          {/* Class Selector */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Class Selector</Text>
+            <Text style={styles.cardSubtitle}>Select Class:</Text>
+            <View style={styles.radioGroup}>
+              {classOptions.map((cls) => (
+                <TouchableOpacity
+                  key={cls.id}
+                  style={styles.radioItem}
+                  onPress={() => setSelectedClass(cls.id)}
+                >
+                  <View style={styles.radioOuter}>
+                    {selectedClass === cls.id && <View style={styles.radioInner} />}
+                  </View>
+                  <Text style={styles.radioLabel}>{cls.label}</Text>
+                  {(cls.id === 'grade10a' || cls.id === 'academic') && (
+                    <Text style={styles.radioArrow}>›</Text>
+                  )}
+                  {cls.id === 'dardale' && (
+                    <Text style={styles.radioArrow}>⌄</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Mental Wellness Overview */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Mental Wellness Overview</Text>
+            <View style={styles.chartContainer}>
+              <View style={styles.lineChartPlaceholder}>
+                <Text style={styles.chartLabel}>Student Sentiment Trend</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Center Column */}
+        <View style={styles.centerColumn}>
+          {/* Academic Health Index */}
+          <View style={[styles.card, styles.healthCard, { flex: 1, justifyContent: 'center' }]}>
+            <Text style={styles.cardTitle}>Academic Health Index</Text>
+            <View style={[styles.circularGaugeContainer, { marginBottom: 0 }]}>
+              <View style={[styles.circularGauge, { width: 180, height: 180 }]}>
+                <Text style={[styles.gaugeNumber, { fontSize: 42 }]}>92</Text>
+              </View>
+              <Text style={[styles.gaugeSubtext, { fontSize: 16, marginTop: 15 }]}>Early Warning: 57 Students</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Right Column */}
+        <View style={styles.rightColumn}>
+          {/* School's Query */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>School's Query</Text>
+            <View style={styles.queryContainer}>
+              <TextInput
+                style={styles.queryInput}
+                placeholder="Type your question about Oveal Sch..."
+                placeholderTextColor="#999"
+              />
+              <TouchableOpacity style={styles.processButton}>
+                <Text style={styles.processButtonText}>Process</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.queryStatus}>⏱ Processing query... ETA: minutes</Text>
+          </View>
+
+          {/* Top 5 Concerns */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Top 5 Concerns</Text>
+            {['Stress & Anxiety', 'Stress & Anxiety', 'Pressure', 'Social Media Use'].map((concern, i) => (
+              <View key={i} style={styles.listItem}>
+                <Text style={styles.purpleBullet}>•</Text>
+                <Text style={styles.listText}>{concern}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Top 5 Strengths */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Top 5 Strengths</Text>
+            {['Resilience', 'Collaboration', 'Sleep Issues', 'Critical Thinking', 'Social Media Use', 'Communications'].map((strength, i) => (
+              <View key={i} style={styles.listItem}>
+                <Text style={styles.purpleBullet}>•</Text>
+                <Text style={styles.listText}>{strength}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+    </ScrollView>
+  );
+
+  // Render Reports Screen
+  const renderReports = () => {
+    return (
+      <ScrollView style={styles.pageContainer} contentContainerStyle={styles.pageContent}>
+        <View style={styles.gridContainer}>
+          {/* Left Column */}
+          <View style={styles.leftColumn}>
+            {/* Class Badge */}
+            <View style={styles.classBadge}>
+              <Text style={styles.classBadgeText}>Class: Grade 10A</Text>
+            </View>
+
+            {/* Mental Wellness Trend */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Mental Wellness Trend</Text>
+              <Text style={styles.cardSubtitle}>- Grade 10A</Text>
+              <View style={styles.lineChartPlaceholder}>
+                <Text style={styles.chartLabel}>Student Sentiment Trend</Text>
+              </View>
+            </View>
+
+            {/* Class Productivity */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Class Productivity</Text>
+              <View style={styles.productivityGaugeContainer}>
+                <View style={styles.productivityGauge}>
+                  <Text style={styles.productivityNumber}>87/100</Text>
+                </View>
+                <Text style={styles.chartLabel}>Student Sentiment Trend</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Center Column */}
+          <View style={styles.centerColumn}>
+            {/* Academic Health Index */}
+            <View style={[styles.card, styles.healthCard]}>
+              <Text style={styles.cardTitle}>Academic Health Index</Text>
+              <View style={styles.circularGaugeContainer}>
+                <View style={styles.circularGauge}>
+                  <Text style={styles.gaugeNumber}>92</Text>
+                </View>
+                <Text style={styles.gaugeSubtext}>Early Warning: 3 Students</Text>
+              </View>
+            </View>
+
+            {/* Cohort Comparison */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Cohort Comparison</Text>
+              <View style={styles.comparisonLabels}>
+                <Text style={styles.comparisonLabel}>Grade 10A</Text>
+                <Text style={styles.comparisonLabel}>School Average</Text>
+              </View>
+              <View style={styles.comparisonChartContainer}>
+                <View style={styles.barChartContainer}>
+                  <View style={styles.reportsBarChart}>
+                    {[
+                      { height: 95, color: '#5e3a8f' },
+                      { height: 75, color: '#b19cd9' },
+                      { height: 60, color: '#b19cd9' },
+                      { height: 90, color: '#5e3a8f' },
+                      { height: 80, color: '#b19cd9' },
+                      { height: 100, color: '#5e3a8f' }
+                    ].map((bar, i) => (
+                      <View key={i} style={styles.reportsBarWrapper}>
+                        <View style={styles.reportsBarContainer}>
+                          <View style={[styles.reportsBar, { height: `${bar.height}%`, backgroundColor: bar.color }]} />
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                  <View style={styles.yAxisLabels}>
+                    <Text style={styles.yLabel}>100%</Text>
+                    <Text style={styles.yLabel}>75%</Text>
+                    <Text style={styles.yLabel}>50%</Text>
+                    <Text style={styles.yLabel}>25%</Text>
+                    <Text style={styles.yLabel}>0%</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Academic Performance */}
+            <View style={[styles.card, { paddingBottom: 20 }]}>
+              <View style={styles.performanceHeader}>
+                <View>
+                  <Text style={styles.cardTitle}>Academic Performance</Text>
+                  <Text style={styles.cardSubtitle}>Grade 10A vs School Average</Text>
+                </View>
+                <TouchableOpacity 
+                  style={styles.manageButton}
+                  onPress={() => setShowSubjectManager(!showSubjectManager)}
+                >
+                  <Text style={styles.manageButtonText}>+ Add Subject</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {showSubjectManager && (
+                <View style={styles.subjectManager}>
+                  <Text style={styles.sectionTitle}>Manage Subjects</Text>
+                  <View style={styles.subjectInputContainer}>
+                    <View style={styles.inputWrapper}>
+                      <TextInput
+                        style={styles.subjectInput}
+                        placeholder="Enter subject name"
+                        placeholderTextColor="#999"
+                        value={newSubject}
+                        onChangeText={setNewSubject}
+                      />
+                      <TouchableOpacity 
+                        style={styles.addButton}
+                        onPress={addSubject}
+                        disabled={!newSubject.trim()}
+                      >
+                        <Text style={styles.addButtonText}>Add</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.subjectList}>
+                      {subjects.map((subject, index) => (
+                        <View key={index} style={styles.subjectItem}>
+                          <View style={styles.subjectColorIndicator} />
+                          <Text style={styles.subjectName} numberOfLines={1}>{subject.name}</Text>
+                          <TouchableOpacity 
+                            style={styles.deleteButton}
+                            onPress={() => removeSubject(index)}
+                          >
+                            <Text style={styles.deleteButtonText}>×</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.chartContainer}>
+                <View style={styles.legendContainer}>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendColor, { backgroundColor: '#5e3a8f' }]} />
+                    <Text style={styles.legendText}>Grade 10A</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendColor, { backgroundColor: '#b19cd9' }]} />
+                    <Text style={styles.legendText}>School Avg</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.chartWrapper}>
+                  <View style={styles.yAxis}>
+                    <Text style={styles.yLabel}>100%</Text>
+                    <Text style={styles.yLabel}>80%</Text>
+                    <Text style={styles.yLabel}>60%</Text>
+                    <Text style={styles.yLabel}>40%</Text>
+                    <Text style={styles.yLabel}>20%</Text>
+                    <Text style={styles.yLabel}>0%</Text>
+                  </View>
+                  
+                  <View style={styles.barChart}>
+                    {subjects.map((subject, i) => {
+                      const maxHeight = Math.max(subject.grade10A, subject.schoolAvg);
+                      const grade10AHeight = (subject.grade10A / 100) * 100;
+                      const schoolAvgHeight = (subject.schoolAvg / 100) * 100;
+                      
+                      return (
+                        <View key={i} style={styles.barGroup}>
+                          <View style={styles.barStack}>
+                            <View 
+                              style={[
+                                styles.bar, 
+                                { 
+                                  height: `${grade10AHeight}%`,
+                                  backgroundColor: '#5e3a8f',
+                                  borderTopLeftRadius: 4,
+                                  borderTopRightRadius: 4,
+                                  shadowColor: '#5e3a8f',
+                                  shadowOffset: { width: 0, height: 2 },
+                                  shadowOpacity: 0.3,
+                                  shadowRadius: 3,
+                                  elevation: 5,
+                                }
+                              ]} 
+                            >
+                              <Text style={styles.barValueTop}>{subject.grade10A}%</Text>
+                            </View>
+                            <View 
+                              style={[
+                                styles.bar, 
+                                { 
+                                  height: `${schoolAvgHeight}%`,
+                                  backgroundColor: '#b19cd9',
+                                  borderBottomLeftRadius: 4,
+                                  borderBottomRightRadius: 4,
+                                  marginTop: 8,
+                                  shadowColor: '#b19cd9',
+                                  shadowOffset: { width: 0, height: 2 },
+                                  shadowOpacity: 0.3,
+                                  shadowRadius: 3,
+                                  elevation: 5,
+                                }
+                              ]} 
+                            >
+                              <Text style={styles.barValueBottom}>{subject.schoolAvg}%</Text>
+                            </View>
+                          </View>
+                          <Text style={styles.subjectLabel} numberOfLines={1}>
+                            {subject.name.split(' ').map(word => word[0]).join('').toUpperCase()}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+                
+                <View style={styles.xAxis}>
+                  <Text style={styles.xLabel}>Subjects</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Right Column */}
+          <View style={styles.rightColumn}>
+            {/* Teacher Report */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Teacher Report</Text>
+              <Text style={styles.cardSubtitle}>Select Subject</Text>
+              <View style={styles.starRating}>
+                <Text style={styles.star}>☆</Text>
+                <Text style={styles.star}>☆</Text>
+                <Text style={styles.star}>☆</Text>
+                <Text style={styles.star}>☆</Text>
+              </View>
+              <TouchableOpacity style={styles.processButton}>
+                <Text style={styles.processButtonText}>Process</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Top 5 Concerns */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Top 5 Concerns</Text>
+              <View style={styles.listItem}>
+                <Text style={styles.purpleBullet}>•</Text>
+                <Text style={styles.listText}>Resilience</Text>
+              </View>
+              <View style={styles.queryContainer}>
+                <TextInput
+                  style={styles.queryInput}
+                  placeholder="Type your question about Class 10A..."
+                  placeholderTextColor="#999"
+                />
+                <TouchableOpacity style={styles.processButton}>
+                  <Text style={styles.processButtonText}>Process</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.queryStatus}>⏱ Becth vs Mecal Use</Text>
+              <Text style={styles.queryStatusSub}>Processing query... ETA minute</Text>
+            </View>
+
+            {/* Top 5 Strengths */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Top 5 Strengths</Text>
+              <View style={styles.queryContainer}>
+                <TextInput
+                  style={styles.queryInput}
+                  placeholder="Type your question about Class 10A..."
+                  placeholderTextColor="#999"
+                />
+                <TouchableOpacity style={styles.processButton}>
+                  <Text style={styles.processButtonText}>Process</Text>
+                </TouchableOpacity>
+              </View>
+              {['Cantal Avenlees', 'Collaboral Grclnues', 'Critical Trinking Flaue', 'Communications'].map((strength, i) => (
+                <View key={i} style={styles.listItem}>
+                  <Text style={styles.purpleBullet}>•</Text>
+                  <Text style={styles.listText}>{strength}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  // Render Settings Screen
+  const renderSettings = () => (
+    <ScrollView style={styles.pageContainer} contentContainerStyle={styles.pageContent}>
+      <View style={styles.settingsGrid}>
+        {/* Top Row */}
+        <View style={styles.settingsTopRow}>
+          {/* School's Health Index */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>School's Health Index</Text>
+            <View style={styles.healthIndexRow}>
+              <View style={styles.healthGaugeWrapper}>
+                <View style={styles.healthGauge}>
+                  <Text style={styles.healthGaugeNumber}>88</Text>
+                </View>
+                <Text style={styles.healthGaugeLabel}>Mental Wellness</Text>
+              </View>
+              <View style={styles.healthBars}>
+                <View>
+                  <Text style={styles.barLabelText}>Math - 40%</Text>
+                  <View style={styles.miniBar}>
+                    <View style={styles.miniBarFill} />
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.barLabelText}>Science - 60%</Text>
+                  <View style={styles.miniBar}>
+                    <View style={[styles.miniBarFill, { width: '60%' }]} />
+                  </View>
+                </View>
+                <View>
+                  <Text style={styles.barLabelText}>English - 100%</Text>
+                  <View style={styles.miniBar}>
+                    <View style={[styles.miniBarFill, { width: '100%', backgroundColor: '#5e3a8f' }]} />
+                  </View>
+                </View>
+              </View>
+            </View>
+            <View style={styles.progressSection}>
+              <Text style={styles.progressLabel}>Mental Health</Text>
+              <Text style={styles.progressValue}>88%</Text>
+            </View>
+            <View style={[styles.progressBar, { height: 8, backgroundColor: '#e0e0e0', borderRadius: 4 }]}>
+              <View style={[styles.progressBarFill, { width: '88%' }]} />
+            </View>
+            <Text style={styles.comparisonText}>vs Regional Avg: 78%</Text>
+          </View>
+
+          {/* School Growth Index */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>School Growth Index</Text>
+            <View style={styles.bubbleChartContainer}>
+              <View style={styles.bubbleChart}>
+                <View style={[styles.bubble, { backgroundColor: '#5e3a8f', top: 20 }]}>
+                  <Text style={styles.bubbleText}>78%</Text>
+                </View>
+                <View style={[styles.bubble, { backgroundColor: '#5e3a8f', left: 30, top: '45%' }]}>
+                  <Text style={styles.bubbleText}>67%</Text>
+                </View>
+                <View style={[styles.bubble, { backgroundColor: '#b19cd9', right: 30, top: '45%' }]}>
+                  <Text style={styles.bubbleText}>71%</Text>
+                </View>
+                <View style={[styles.bubble, { backgroundColor: '#4CAF50', bottom: 20 }]}>
+                  <Text style={styles.bubbleText}>83/100</Text>
+                </View>
+                <Text style={{ position: 'absolute', top: 10, left: 15, fontSize: 11, color: '#666', fontWeight: '500' }}>Academics</Text>
+                <Text style={{ position: 'absolute', right: 15, top: '50%', fontSize: 11, color: '#666', fontWeight: '500' }}>Well-being</Text>
+              </View>
+            </View>
+            <Text style={styles.overallScore}>Overall Score: 83/100</Text>
+          </View>
+
+          {/* Teacher Performance Overview */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Teacher Performance Overview</Text>
+            <View style={styles.teacherGauges}>
+              <View style={styles.teacherGauge}>
+                <View style={styles.performanceCircle}>
+                  <Text style={styles.performanceText}>85/100</Text>
+                </View>
+                <Text style={styles.gaugeSubtext}>Avg Performance</Text>
+              </View>
+              <View style={styles.teacherGauge}>
+                <View style={styles.performanceCircle}>
+                  <Text style={styles.performanceText}>92/100</Text>
+                </View>
+                <Text style={styles.gaugeSubtext}>Engagement</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Middle Row */}
+        <View style={styles.settingsMiddleRow}>
+          {/* Best Students */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Best Students (Academics & Wellness)</Text>
+            <View style={styles.studentItem}>
+              <View style={styles.studentAvatar}>
+                <Text style={styles.avatarText}>👨</Text>
+              </View>
+              <Text style={styles.studentName}>Priya Sharma</Text>
+              <Text style={styles.studentGrade}>A | 95 😊 95 😊</Text>
+            </View>
+            <View style={styles.studentItem}>
+              <View style={styles.studentAvatar}>
+                <Text style={styles.avatarText}>👨</Text>
+              </View>
+              <Text style={styles.studentName}>Zoe Lee 😊 90 88</Text>
+            </View>
+            <TouchableOpacity style={styles.viewRankingsButton}>
+              <Text style={styles.viewRankingsText}>View Full Rankings</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Teacher Insights */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Teacher Insights</Text>
+            <Text style={styles.teacherName}>Ms. Anjali Sharma</Text>
+            
+            {/* Rating Scale */}
+            <View style={styles.ratingContainer}>
+              <Text style={styles.ratingLabel}>Overall Rating:</Text>
+              <View style={styles.ratingScale}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                  <View key={num} style={styles.ratingNumberContainer}>
+                    <Text style={styles.ratingNumber}>{num}</Text>
+                    <View style={styles.ratingTick}></View>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.ratingIndicator}>
+                <View style={styles.ratingFill} />
+              </View>
+            </View>
+
+            {/* Strengths */}
+            <View style={styles.insightsSection}>
+              <Text style={styles.sectionTitle}>Strengths</Text>
+              <View style={styles.strengthItem}>
+                <Text style={styles.strengthBullet}>•</Text>
+                <Text style={styles.strengthText}>Excellent classroom management</Text>
+              </View>
+              <View style={styles.strengthItem}>
+                <Text style={styles.strengthBullet}>•</Text>
+                <Text style={styles.strengthText}>Strong subject knowledge</Text>
+              </View>
+              <View style={styles.strengthItem}>
+                <Text style={styles.strengthBullet}>•</Text>
+                <Text style={styles.strengthText}>Good student engagement</Text>
+              </View>
+            </View>
+
+            {/* Weaknesses */}
+            <View style={styles.insightsSection}>
+              <Text style={styles.sectionTitle}>Areas for Improvement</Text>
+              <View style={styles.weaknessItem}>
+                <Text style={styles.weaknessBullet}>•</Text>
+                <Text style={styles.weaknessText}>Could provide more detailed feedback</Text>
+              </View>
+              <View style={styles.weaknessItem}>
+                <Text style={styles.weaknessBullet}>•</Text>
+                <Text style={styles.weaknessText}>Pacing could be adjusted for slower learners</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Bottom Row */}
+        <View style={styles.settingsBottomRow}>
+          {/* Generate Export */}
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.exportButton}>
+              <Text style={styles.exportIcon}>📖</Text>
+              <View>
+                <Text style={styles.exportTitle}>Generate Export for Parent Reports</Text>
+                <Text style={styles.exportSubtitle}>(PDF/CSV)</Text>
+              </View>
+            </TouchableOpacity>
+            <View style={styles.latestReport}>
+              <Text style={styles.reportIcon}>🕒</Text>
+              <Text style={styles.reportText}>Latest report: October 25, 2023</Text>
+            </View>
+          </View>
+
+          {/* Strategic AI-Based Advisor */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Strategic AI-Based Advisor</Text>
+            <View style={styles.advisorHeader}>
+              <Text style={styles.advisorStars}>★ ★ ★</Text>
+              <Text style={styles.advisorTitle}>Sremics Advisor</Text>
+              <Text style={styles.advisorIcon}>🤖</Text>
+            </View>
+            <View style={styles.queryContainer}>
+              <TextInput
+                style={styles.queryInput}
+                placeholder="Suggest about curiculum gaps..."
+                placeholderTextColor="#999"
+              />
+              <TouchableOpacity style={styles.processButton}>
+                <Text style={styles.processButtonText}>Process</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.advisorSuggestion}>Suget community outreach ideas...</Text>
+          </View>
+
+          {/* Principal's Query Engine */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Principal's Query Engine</Text>
+            <Text style={styles.queryDescription}>Type your strategic question about schoorol performance, oudgt allocation, or staff development</Text>
+            <TouchableOpacity style={styles.insightsButton}>
+              <Text style={styles.insightsButtonText}>Get Insights</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </ScrollView>
+  );
+
+  return (
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.logoContainer}>
+            <Text style={styles.logo}>🌿</Text>
+            <Text style={styles.logoText}>ZENARK</Text>
+          </View>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle}>ZENARK: School Analytics Dashboard - Overall View</Text>
+            <Text style={styles.headerSubtitle}>Green Valley High School</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Top Navigation */}
+      <View style={styles.topNav}>
+        <TouchableOpacity 
+          style={[styles.topNavItem, activeTab === 'settings' && styles.topNavItemActive]}
+          onPress={() => setActiveTab('settings')}
+        >
+          <Text style={styles.topNavIcon}>📋</Text>
+          <Text style={[styles.topNavText, activeTab === 'settings' && styles.topNavTextActive]}>Settings</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.topNavItem, activeTab === 'home' && styles.topNavItemActive]}
+          onPress={() => setActiveTab('home')}
+        >
+          <Text style={styles.topNavIcon}>🏠</Text>
+          <Text style={[styles.topNavText, activeTab === 'home' && styles.topNavTextActive]}>Home</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.topNavItem, activeTab === 'reports' && styles.topNavItemActive]}
+          onPress={() => setActiveTab('reports')}
+        >
+          <Text style={styles.topNavIcon}>📊</Text>
+          <Text style={[styles.topNavText, activeTab === 'reports' && styles.topNavTextActive]}>Reports</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.topNavItem}>
+          <Text style={styles.topNavText}>Help</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Main Content */}
+      <Animated.View 
+        style={[
+          styles.content,
+          {
+            transform: [{ translateX: slideAnim }]
+          }
+        ]} 
+        {...panResponder.panHandlers}
+      >
+        {activeTab === 'settings' && renderSettings()}
+        {activeTab === 'home' && renderHome()}
+        {activeTab === 'reports' && renderReports()}
+        
+        {/* Page Indicators */}
+        <View style={styles.pageIndicators}>
+          {tabs.map((tab, index) => (
+            <View 
+              key={tab}
+              style={[
+                styles.pageIndicator,
+                activeTab === tab && styles.pageIndicatorActive
+              ]}
+            />
+          ))}
+        </View>
+      </Animated.View>
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity style={styles.bottomNavIcon}>
+          <Text style={styles.bottomNavText}>☰</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.bottomNavIcon}
+          onPress={() => setActiveTab('home')}
+        >
+          <Text style={styles.bottomNavText}>🏠</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.bottomNavIcon}
+          onPress={() => {
+            const currentIndex = tabs.indexOf(activeTab);
+            if (currentIndex > 0) setActiveTab(tabs[currentIndex - 1]);
+          }}
+        >
+          <Text style={styles.bottomNavText}>‹</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.bottomNavIcon}>
+          <Text style={styles.bottomNavText}>○</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.bottomNavIcon}
+          onPress={() => {
+            const currentIndex = tabs.indexOf(activeTab);
+            if (currentIndex < tabs.length - 1) setActiveTab(tabs[currentIndex + 1]);
+          }}
+        >
+          <Text style={styles.bottomNavText}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.bottomNavSpacer} />
+        <TouchableOpacity style={styles.bottomNavIcon}>
+          <Text style={styles.bottomNavText}>📋</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.bottomNavIcon}>
+          <Text style={styles.bottomNavText}>📤</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.bottomNavIcon}>
+          <Text style={styles.bottomNavText}>⚙</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// Styles have been moved to AppStyles.js
+    flex: isTablet ? 1 : undefined,
+    minWidth: isTablet ? 280 : undefined,
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  healthCard: {
+    borderWidth: 3,
+    borderColor: '#5e3a8f',
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 15,
+    color: '#1a1a1a',
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+  },
+  radioGroup: {
+    marginTop: 8,
+  },
+  radioItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  radioOuter: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#5e3a8f',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#5e3a8f',
+  },
+  radioLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+  },
+  radioArrow: {
+    fontSize: 16,
+    color: '#999',
+  },
+  chartContainer: {
+    marginTop: 10,
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  lineChartPlaceholder: {
+    height: 200,
+    backgroundColor: '#f8f5fc',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e8e0f0',
+  },
+  chartLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  circularGaugeContainer: {
+    alignItems: 'center',
+    paddingVertical: 25,
+    paddingHorizontal: 20,
+  },
+  circularGauge: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderWidth: 14,
+    borderColor: '#5e3a8f',
+    borderTopColor: '#b19cd9',
+    borderRightColor: '#b19cd9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  gaugeNumber: {
+    fontSize: 52,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  gaugeSubtext: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  barChartContainer: {
+    flexDirection: 'row',
+    marginTop: 15,
+    height: 200,
+    alignItems: 'flex-end',
+  },
+  barChart: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: '100%',
+    paddingHorizontal: 10,
+    borderLeftWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#e0e0e0',
+    marginLeft: 10,
+  },
+  barWrapper: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 4,
+    height: '100%',
+  },
+  barContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'flex-end',
+    paddingBottom: 20
+  },
+  barLabel: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  yAxisLabels: {
+    width: 45,
+    height: 160,
+    justifyContent: 'space-between',
+  },
+  yLabel: {
+    fontSize: 10,
+    color: '#999',
+    textAlign: 'right',
+  },
+  queryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  queryInput: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 12,
+    marginRight: 10,
+    fontSize: 14,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  processButton: {
+    backgroundColor: '#5e3a8f',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  processButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  listBullet: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#6a4c93',
+    marginRight: 10,
+  },
+  listText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  bottomNav: {
+    flexDirection: 'row',
+    height: 50,
+    backgroundColor: '#5e3a8f',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+  },
+  bottomNavIcon: {
+    marginHorizontal: 8,
+  },
+  bottomNavText: {
+    color: 'white',
+    fontSize: 18,
+  },
+  bottomNavSpacer: {
+    flex: 1,
+  },
+  pageIndicators: {
+    position: 'absolute',
+    bottom: 15,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginHorizontal: '40%',
+  },
+  pageIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#999',
+    marginHorizontal: 5,
+    transition: 'all 0.3s ease',
+  },
+  pageIndicatorActive: {
+    backgroundColor: '#5e3a8f',
+    width: 28,
+    height: 8,
+  },
+  legendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 15,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+    flexDirection: isTablet ? 'row' : 'column',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    marginTop: 10,
+  },
+  circleGauge: {
+    width: isTablet ? 140 : 120,
+    height: isTablet ? 140 : 120,
+    borderRadius: isTablet ? 70 : 60,
+    borderWidth: 10,
+    borderColor: '#6a4c93',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: isTablet ? 0 : 20,
+  },
+  circleGaugeText: {
+    fontSize: isTablet ? 32 : 28,
+    fontWeight: 'bold',
+    color: '#6a4c93',
+  },
+  circleGaugeLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+  },
+  legendContainer: {
+    flex: 1,
+    marginLeft: isTablet ? 30 : 0,
+  },
+  legendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 15,
+    backgroundColor: '#f8f8f8',
+    padding: 8,
+    borderRadius: 20,
+    alignSelf: 'center',
+  },
+  legendColor: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    marginRight: 6,
+  },
+  legendText: {
+    fontSize: 11,
+    color: '#555',
+    fontWeight: '500',
+  },
+  growthContainer: {
+    marginTop: 10,
+  },
+  growthItem: {
+    marginBottom: 15,
+  },
+  growthLabel: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+  progressTrack: {
+    height: 10,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 5,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  growthValue: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'right',
+  },
+  chartPlaceholder: {
+    height: 200,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  chartPlaceholderText: {
+    fontSize: 16,
+    color: '#999',
+  },
+  alertItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  alertContent: {
+    flex: 1,
+  },
+  alertName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 4,
+  },
+  alertIssue: {
+    fontSize: 12,
+    color: '#666',
+  },
+  alertBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  alertBadgeText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  settingItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  settingLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  settingValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  settingButton: {
+    backgroundColor: '#6a4c93',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  settingButtonText: {
+    color: 'white',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  navBar: {
+    flexDirection: 'row',
+    height: 60,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingHorizontal: 10,
+  },
+  navItem: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  navItemActive: {
+    borderTopWidth: 2,
+    borderTopColor: '#6a4c93',
+  },
+  navIcon: {
+    fontSize: 20,
+    marginBottom: 2,
+    color: '#999',
+  },
+  navIconActive: {
+    color: '#6a4c93'
+  },
+  navLabel: {
+    fontSize: 12,
+    color: '#999'
+  },
+// Styles have been moved to AppStyles.js
