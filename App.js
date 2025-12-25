@@ -72,6 +72,35 @@ export default function App() {
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
   const [signupSchool, setSignupSchool] = useState('');
 
+  // ZPI (Zenark Productivity Index) states
+  const [studentZPI, setStudentZPI] = useState(null); // Individual student ZPI
+  const [classAverageZPI, setClassAverageZPI] = useState(75); // Class average ZPI (random default)
+
+  // Helper function to generate random ZPI score with breakdown
+  const generateRandomZPI = () => {
+    const performance = Math.floor(Math.random() * 41) + 60; // 60-100
+    const effort = Math.floor(Math.random() * 41) + 60; // 60-100
+    const readiness = Math.floor(Math.random() * 41) + 60; // 60-100
+
+    // Calculate weighted ZPI: P(50%) + E(30%) + R(20%)
+    const zpi = Math.round(performance * 0.5 + effort * 0.3 + readiness * 0.2);
+
+    return {
+      zpi,
+      performance,
+      effort,
+      readiness
+    };
+  };
+
+  // Helper function to get ZPI label and color
+  const getZPILabel = (score) => {
+    if (score >= 90) return { label: 'Exceptional', color: '#4CAF50' };
+    if (score >= 75) return { label: 'Stable', color: '#2196F3' };
+    if (score >= 50) return { label: 'At-Risk', color: '#FF9800' };
+    return { label: 'Critical', color: '#F44336' };
+  };
+
 
   const [userProfile, setUserProfile] = useState(() => {
     // Get user profile from localStorage or use default
@@ -285,6 +314,11 @@ export default function App() {
 
       console.log('API Response:', response.data);
       setDashboardData(response.data.data || response.data);
+
+      // Generate random ZPI for this student
+      const zpiData = generateRandomZPI();
+      setStudentZPI(zpiData);
+      console.log('Generated ZPI for student:', zpiData);
     } catch (error) {
       console.error('Error fetching student data:', error);
       if (Alert) {
@@ -507,14 +541,6 @@ export default function App() {
           </View>
         </View>
 
-        {/* Class Productivity */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Class Productivity</Text>
-          <View style={styles.productivityGaugeContainer}>
-            <Text style={styles.notAvailableText}>Not Available</Text>
-          </View>
-        </View>
-
         {/* Mental Wellness Overview */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Mental Wellness Overview</Text>
@@ -589,12 +615,50 @@ export default function App() {
           </View>
         </View>
 
-        {/* Teacher Report */}
+        {/* Class Productivity (ZPI) */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Teacher Report</Text>
-          <View style={styles.productivityGaugeContainer}>
-            <Text style={styles.notAvailableText}>Not Available</Text>
-          </View>
+          <Text style={styles.cardTitle}>Class Productivity</Text>
+          <Text style={styles.cardSubtitle}>Zenark Productivity Index (ZPI)</Text>
+
+          {(() => {
+            const { label, color } = getZPILabel(classAverageZPI);
+            return (
+              <View style={styles.zpiContainer}>
+                <View style={styles.zpiScoreContainer}>
+                  <Text style={[styles.zpiScore, { color }]}>{classAverageZPI}</Text>
+                  <Text style={styles.zpiMaxScore}>/100</Text>
+                </View>
+                <View style={[styles.zpiLabelBadge, { backgroundColor: color }]}>
+                  <Text style={styles.zpiLabelText}>{label}</Text>
+                </View>
+
+                <View style={styles.zpiBreakdown}>
+                  <Text style={styles.zpiBreakdownTitle}>Class Average Breakdown:</Text>
+                  <View style={styles.zpiBreakdownItem}>
+                    <Text style={styles.zpiBreakdownLabel}>Performance (50%)</Text>
+                    <View style={styles.zpiProgressBar}>
+                      <View style={[styles.zpiProgressFill, { width: '80%', backgroundColor: '#4CAF50' }]} />
+                    </View>
+                    <Text style={styles.zpiBreakdownValue}>80</Text>
+                  </View>
+                  <View style={styles.zpiBreakdownItem}>
+                    <Text style={styles.zpiBreakdownLabel}>Effort (30%)</Text>
+                    <View style={styles.zpiProgressBar}>
+                      <View style={[styles.zpiProgressFill, { width: '70%', backgroundColor: '#2196F3' }]} />
+                    </View>
+                    <Text style={styles.zpiBreakdownValue}>70</Text>
+                  </View>
+                  <View style={styles.zpiBreakdownItem}>
+                    <Text style={styles.zpiBreakdownLabel}>Readiness (20%)</Text>
+                    <View style={styles.zpiProgressBar}>
+                      <View style={[styles.zpiProgressFill, { width: '75%', backgroundColor: '#FF9800' }]} />
+                    </View>
+                    <Text style={styles.zpiBreakdownValue}>75</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })()}
         </View>
 
         {/* Principal's Query Engine */}
@@ -873,6 +937,64 @@ export default function App() {
               <Text style={styles.noDataText}>No strengths data available</Text>
             )}
           </View>
+        </View>
+
+        {/* Academic Productivity Index (ZPI) */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Academic Productivity Index</Text>
+          <Text style={styles.cardSubtitle}>Zenark Productivity Index (ZPI)</Text>
+
+          {studentZPI ? (
+            (() => {
+              const { label, color } = getZPILabel(studentZPI.zpi);
+              return (
+                <View style={styles.zpiContainer}>
+                  <View style={styles.zpiScoreContainer}>
+                    <Text style={[styles.zpiScore, { color }]}>{studentZPI.zpi}</Text>
+                    <Text style={styles.zpiMaxScore}>/100</Text>
+                  </View>
+                  <View style={[styles.zpiLabelBadge, { backgroundColor: color }]}>
+                    <Text style={styles.zpiLabelText}>{label}</Text>
+                  </View>
+
+                  <View style={styles.zpiBreakdown}>
+                    <Text style={styles.zpiBreakdownTitle}>Individual Breakdown:</Text>
+                    <View style={styles.zpiBreakdownItem}>
+                      <Text style={styles.zpiBreakdownLabel}>Performance (50%)</Text>
+                      <View style={styles.zpiProgressBar}>
+                        <View style={[styles.zpiProgressFill, { width: `${studentZPI.performance}%`, backgroundColor: '#4CAF50' }]} />
+                      </View>
+                      <Text style={styles.zpiBreakdownValue}>{studentZPI.performance}</Text>
+                    </View>
+                    <View style={styles.zpiBreakdownItem}>
+                      <Text style={styles.zpiBreakdownLabel}>Effort (30%)</Text>
+                      <View style={styles.zpiProgressBar}>
+                        <View style={[styles.zpiProgressFill, { width: `${studentZPI.effort}%`, backgroundColor: '#2196F3' }]} />
+                      </View>
+                      <Text style={styles.zpiBreakdownValue}>{studentZPI.effort}</Text>
+                    </View>
+                    <View style={styles.zpiBreakdownItem}>
+                      <Text style={styles.zpiBreakdownLabel}>Readiness (20%)</Text>
+                      <View style={styles.zpiProgressBar}>
+                        <View style={[styles.zpiProgressFill, { width: `${studentZPI.readiness}%`, backgroundColor: '#FF9800' }]} />
+                      </View>
+                      <Text style={styles.zpiBreakdownValue}>{studentZPI.readiness}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.zpiNote}>
+                    <Text style={styles.zpiNoteText}>
+                      💡 ZPI = Performance (50%) + Effort (30%) + Readiness (20%)
+                    </Text>
+                  </View>
+                </View>
+              );
+            })()
+          ) : (
+            <View style={styles.productivityGaugeContainer}>
+              <Text style={styles.chartLabel}>Enter a student ID to see their productivity index</Text>
+            </View>
+          )}
         </View>
       </View>
     </ScrollView>
@@ -3110,5 +3232,87 @@ const styles = StyleSheet.create({
   },
   classDropdownContainer: {
     marginTop: 10,
+  },
+  // ZPI Styles
+  zpiContainer: {
+    padding: 20,
+  },
+  zpiScoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  zpiScore: {
+    fontSize: 64,
+    fontWeight: 'bold',
+  },
+  zpiMaxScore: {
+    fontSize: 24,
+    color: '#999',
+    marginLeft: 5,
+  },
+  zpiLabelBadge: {
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 20,
+  },
+  zpiLabelText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  zpiBreakdown: {
+    marginTop: 10,
+  },
+  zpiBreakdownTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+  },
+  zpiBreakdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  zpiBreakdownLabel: {
+    fontSize: 13,
+    color: '#666',
+    width: 120,
+  },
+  zpiProgressBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    marginHorizontal: 10,
+    overflow: 'hidden',
+  },
+  zpiProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  zpiBreakdownValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    width: 30,
+    textAlign: 'right',
+  },
+  zpiNote: {
+    marginTop: 15,
+    padding: 12,
+    backgroundColor: '#f0f7ff',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2196F3',
+  },
+  zpiNoteText: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 18,
   },
 });
