@@ -13,7 +13,8 @@ import {
   Switch,
   PanResponder,
   Animated,
-  Image
+  Image,
+  Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
@@ -22,8 +23,10 @@ const { width, height } = Dimensions.get('window');
 const isTablet = width >= 600;
 const isLargeScreen = width >= 1024; // For laptop/desktop screens
 
-// Netlify proxy server URL
-const PROXY_SERVER = 'https://endearing-syrniki-6e8c5c.netlify.app';
+// API Base URLs
+const AUTH_BASE_URL = 'https://srv1116243.hstgr.cloud'; // New auth server (fixed)
+const DASHBOARD_BASE_URL = 'https://service.zenark.in/zenark'; // Old dashboard server
+const PROXY_SERVER = 'https://endearing-syrniki-6e8c5c.netlify.app'; // Fallback proxy
 
 // Main App Component
 export default function App() {
@@ -146,24 +149,30 @@ export default function App() {
   useEffect(() => {
     const getClassData = async () => {
       try {
-        // Skip data fetching for Team Academy (no data available)
+        // If Team Academy, we acknowledge it might be empty
         const isTeamAcademy = userProfile.school === 'THE TEAM ACADEMY DAVANAGERE' ||
           userProfile.school === 'Team Academy' ||
           userProfile.school?.includes('TEAM ACADEMY');
 
-        if (isTeamAcademy) {
-          console.log('Team Academy user - no data available, skipping fetch');
+        console.log(`Team Academy check: ${isTeamAcademy}`);
+        if (isTeamAcademy && !userProfile.currentClass && !userProfile.class) {
+          console.log('Team Academy user with no assigned class - using placeholder');
+          setCurrentClassName('Not Assigned');
+        }
+
+        // Get the class name from user profile, fallback to MAD-1 ONLY for Sir MV
+        const className = userProfile.currentClass || userProfile.class ||
+          (userProfile.school?.includes('Sir MV') ? 'MAD-1' : 'Not Assigned');
+
+        setCurrentClassName(className); // Store it so we can display it
+
+        if (className === 'Not Assigned') {
+          console.log('No class assigned, skipping fetch');
           setFreshClassData(null);
-          setFreshSchoolData(null);
           return;
         }
 
-        // Get the class name from user profile, fallback to MAD-1
-        const className = userProfile.currentClass || userProfile.class || 'MAD-1';
-        setCurrentClassName(className); // Store it so we can display it
         console.log(`Fetching fresh class data for: ${className}`);
-
-
         const response = await axios.get(`${PROXY_SERVER}/api/class/${className}`);
         console.log('Class data response:', response.data);
 
@@ -213,11 +222,13 @@ export default function App() {
         }
       } catch (error) {
         console.error('Error fetching class data:', error);
-        if (Alert) {
+        if (Platform.OS !== 'web') {
           Alert.alert(
             'Error',
             error.response?.data?.error || 'Failed to fetch class data. Please try again.'
           );
+        } else {
+          console.error('Fetch error:', error.response?.data || error.message);
         }
       }
     };
@@ -292,19 +303,8 @@ export default function App() {
   };
 
   const fetchDashboardData = async (identifier) => {
-    // Block student search for Team Academy (no data available)
-    const isTeamAcademy = userProfile.school === 'THE TEAM ACADEMY DAVANAGERE' ||
-      userProfile.school === 'Team Academy' ||
-      userProfile.school?.includes('TEAM ACADEMY');
-
-    if (isTeamAcademy) {
-      if (Alert) {
-        Alert.alert('No Data', 'Student data is not available for this school yet.');
-      } else {
-        alert('Student data is not available for this school yet.');
-      }
-      return;
-    }
+    // We no longer block Team Academy, let's try to fetch
+    console.log(`Fetching dashboard data for: ${identifier} (School: ${userProfile.school})`);
 
     try {
       console.log('Fetching data for:', identifier);
@@ -1066,7 +1066,7 @@ export default function App() {
     setLoginError('');
 
     try {
-      const response = await axios.post(`${PROXY_SERVER}/api/auth/signin`, {
+      const response = await axios.post(`${AUTH_BASE_URL}/api/auth/signin`, {
         email: email.toLowerCase(),
         password
       });
@@ -1092,10 +1092,43 @@ export default function App() {
         setUserProfile(userData);
       }
     } catch (error) {
-      console.error('Login error:', error);
-      setLoginError(error.response?.data?.message || 'Login failed. Please check your credentials.');
-      if (Platform.OS !== 'web') {
-        if (Alert) Alert.alert('Login Failed', error.response?.data?.message || 'Please check your credentials.');
+      console.error('Login error on new server:', error);
+
+      // Fallback: Try old server for existing accounts (sirmv, teamacademy, etc.)
+      try {
+        console.log('Trying old server for existing account...');
+        const fallbackResponse = await axios.post(`${PROXY_SERVER}/api/auth/signin`, {
+          email: email.toLowerCase(),
+          password
+        });
+
+        console.log('Login response from old server:', fallbackResponse.data);
+
+        if (fallbackResponse.data) {
+          const { token, ...userData } = fallbackResponse.data;
+
+          if (userData.currentClass) {
+            setSelectedClass(userData.currentClass);
+          } else if (userData.classes && userData.classes.length > 0) {
+            setSelectedClass(userData.classes[0]);
+          }
+
+          localStorage.setItem('isLoggedIn', 'true');
+          if (token) localStorage.setItem('authToken', token);
+          localStorage.setItem('userProfile', JSON.stringify(userData));
+
+          setIsLoggedIn(true);
+          setUserProfile(userData);
+          return; // Success!
+        }
+      } catch (fallbackError) {
+        console.error('Login failed on both servers:', fallbackError);
+        setLoginError(error.response?.data?.message || 'Login failed. Please check your credentials.');
+        if (Platform.OS !== 'web') {
+          Alert.alert('Login Failed', error.response?.data?.message || 'Please check your credentials.');
+        } else {
+          console.error('Login failed:', error.response?.data?.message || fallbackError.message);
+        }
       }
     } finally {
       setIsLoggingIn(false);
@@ -1118,19 +1151,19 @@ export default function App() {
     setLoginError('');
 
     try {
-      const response = await axios.post(`${PROXY_SERVER}/api/auth/signup`, {
+      const response = await axios.post(`${AUTH_BASE_URL}/api/auth/signup`, {
         name: signupName,
         email: signupEmail.toLowerCase(),
         password: signupPassword,
         school: signupSchool,
-        roles: ['admin']
+        roles: ['student'] // Backend only has 'student' role
       });
 
       console.log('Signup response:', response.data);
 
       if (response.data) {
         if (Platform.OS !== 'web') {
-          if (Alert) Alert.alert('Success', 'Account created successfully! Please log in.');
+          Alert.alert('Success', 'Account created successfully! Please log in.');
         } else {
           alert('Account created successfully! Please log in.');
         }
@@ -1139,9 +1172,24 @@ export default function App() {
       }
     } catch (error) {
       console.error('Signup error:', error);
-      setLoginError(error.response?.data?.message || 'Signup failed. Please try again.');
+      console.error('Signup error response:', error.response?.data);
+      console.error('Signup error status:', error.response?.status);
+
+      // Parse validation errors
+      let errorMessage = 'Signup failed. Please try again.';
+      if (error.response?.data?.detail && Array.isArray(error.response.data.detail)) {
+        // Backend returns array of validation errors
+        const firstError = error.response.data.detail[0];
+        errorMessage = firstError.msg || JSON.stringify(firstError);
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
+      setLoginError(errorMessage);
       if (Platform.OS !== 'web') {
-        if (Alert) Alert.alert('Signup Failed', error.response?.data?.message || 'Please try again.');
+        Alert.alert('Signup Failed', error.response?.data?.message || 'Please try again.');
+      } else {
+        console.error('Signup error:', error.response?.data?.message || error.message);
       }
     } finally {
       setIsLoggingIn(false);
